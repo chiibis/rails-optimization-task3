@@ -2,3 +2,8 @@
 /tmp
 /log
 /public
+
+
+.generators
+.idea/
+.DS_store
