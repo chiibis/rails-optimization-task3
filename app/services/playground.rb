@@ -1,13 +1,16 @@
 class Playground
 
-  FILENAME = 'small.json'   # 1000 trips
+  # FILENAME = 'small.json'   # 1000 trips
   # FILENAME = 'medium.json'  # 10000 trips
-  # FILENAME = 'large.json'   # 100000 trips
+  FILENAME = 'large.json'   # 100000 trips
 
   def call
     puts "### Playground START", ""
 
     trips_count = 0
+
+    @buses = []
+    @trips = []
 
     @services_cache = {}
     @services_arr = []
@@ -17,16 +20,28 @@ class Playground
 
     clear_db
 
-    time = Benchmark.realtime do
+    time_parse = Benchmark.realtime do
       trips_count = json_stream_read
+    end
+
+    time_write = Benchmark.realtime do
+      active_record_import
     end
 
     puts "filename      : #{FILENAME}"
     puts "trips count   : #{trips_count}"
-    puts "processed in  : #{time.round(1)} seconds "
+    puts "processed in  : #{time_parse.round(1)} seconds "
+    puts "written in    : #{time_write.round(1)} seconds "
     puts "memory used   : #{memory_usage_mb} MB"
 
     puts "", "### <- END"
+  end
+
+  def active_record_import
+    City.import     @cities_arr
+    Service.import  @services_arr
+    Bus.import      @buses, recursive: true
+    Trip.import     @trips
   end
 
   def clear_db
@@ -99,7 +114,6 @@ class Playground
 
     streamer.get(nesting_level: 1, symbolize_keys: false) do |trip|
       counter += 1
-      next if counter > 1
 
       from = cached_city(trip['from'])
       to = cached_city(trip['to'])
@@ -120,7 +134,7 @@ class Playground
       }
 
       bus = Bus.new(bus_params)
-   
+
       trip_params = {
         from: from,
         to: to,
@@ -130,15 +144,9 @@ class Playground
         price_cents: trip['price_cents']
       }
 
-      trips << Trip.new(trip_params)
-      buses << bus
-
+      @trips << Trip.new(trip_params)
+      @buses << bus
     end
-
-    City.import(@cities_arr)
-    Service.import(@services_arr)
-    Bus.import buses, recursive: true
-    Trip.import(trips)
 
     counter
   end
