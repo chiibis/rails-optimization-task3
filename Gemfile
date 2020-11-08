@@ -7,7 +7,11 @@ gem 'rails', '~> 5.2.3'
 gem 'pg', '>= 0.18', '< 2.0'
 gem 'puma', '~> 3.11'
 gem 'bootsnap', '>= 1.1.0', require: false
-gem 'json-streamer'
+
+gem 'oj', '~> 3.10'
+gem 'progress_bar', '~> 1.3'
+gem 'json-streamer', '~> 2.1'
+gem 'activerecord-import', '~> 1.0.7'
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
