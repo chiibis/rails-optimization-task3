@@ -9,7 +9,6 @@ class Playground
 
     trips_count = 0
 
-    @buses = []
     @trips = []
 
     @services_cache = {}
@@ -17,6 +16,9 @@ class Playground
 
     @cities_cache = {}
     @cities_arr = []
+
+    @buses_cache = {}
+    @buses_arr = []
 
     clear_db
 
@@ -32,6 +34,7 @@ class Playground
     puts "trips count   : #{trips_count}"
     puts "processed in  : #{time_parse.round(1)} seconds "
     puts "written in    : #{time_write.round(1)} seconds "
+    puts "total in      : #{(time_write + time_parse).round(1)} seconds "
     puts "memory used   : #{memory_usage_mb} MB"
 
     puts "", "### <- END"
@@ -40,7 +43,7 @@ class Playground
   def active_record_import
     City.import     @cities_arr
     Service.import  @services_arr
-    Bus.import      @buses, recursive: true
+    Bus.import      @buses_arr, recursive: true
     Trip.import     @trips
   end
 
@@ -53,31 +56,7 @@ class Playground
     ActiveRecord::Base.connection.execute('delete from buses_services;')
   end
 
-  def create_single_trip(trip)
-    from = City.find_or_create_by(name: trip['from'])
-    to = City.find_or_create_by(name: trip['to'])
 
-    services = []
-
-    trip['bus']['services'].each do |service|
-      s = Service.find_or_create_by(name: service)
-      services << s
-    end
-
-    bus = Bus.find_or_create_by(number: trip['bus']['number'])
-    bus.update(model: trip['bus']['model'], services: services)
-
-    trip_params = {
-      from: from,
-      to: to,
-      bus: bus,
-      start_time: trip['start_time'],
-      duration_minutes: trip['duration_minutes'],
-      price_cents: trip['price_cents']
-    }
-
-    Trip.new(trip_params)
-  end
 
   def cached_service(service_name)
     service = @services_cache[service_name]
@@ -103,30 +82,21 @@ class Playground
     city
   end
 
-  def json_stream_read
-    counter = 0
-    file_stream = File.open(full_path, 'r')
+  def cached_bus(bus_node)
+    bus_key = "#{bus_node['model']}#{bus_node['number']}"
 
-    streamer = Json::Streamer.parser(file_io: file_stream)
+    # puts "@bus key #{bus_key}"
 
-    trips = []
-    buses = []
+    bus = @buses_cache[bus_key]
 
-    streamer.get(nesting_level: 1, symbolize_keys: false) do |trip|
-      counter += 1
-
-      from = cached_city(trip['from'])
-      to = cached_city(trip['to'])
-
+    unless bus.present?
       bus_services = []
-      bus_node = trip['bus']
 
       bus_node['services'].each do |service|
         s = cached_service(service)
         bus_services << s
       end
 
-      # bus_key = bus_node['model'] + bus_node['number']
       bus_params = {
         number: bus_node['number'],
         model: bus_node['model'],
@@ -134,6 +104,31 @@ class Playground
       }
 
       bus = Bus.new(bus_params)
+      @buses_cache[bus_key] = bus
+      @buses_arr << bus
+    end
+
+    bus
+  end
+
+  def json_stream_read
+    counter = 0
+    file_stream = File.open(full_path, 'r')
+
+    streamer = Json::Streamer.parser(file_io: file_stream)
+
+    progress_bar = ProgressBar.new(trips_count)
+
+
+    streamer.get(nesting_level: 1, symbolize_keys: false) do |trip|
+      counter += 1
+      progress_bar.increment!
+
+      from = cached_city(trip['from'])
+      to = cached_city(trip['to'])
+
+      bus_node = trip['bus']
+      bus = cached_bus(bus_node)
 
       trip_params = {
         from: from,
@@ -145,7 +140,6 @@ class Playground
       }
 
       @trips << Trip.new(trip_params)
-      @buses << bus
     end
 
     counter
@@ -154,6 +148,19 @@ class Playground
   def memory_usage_mb
     usage_mb = `ps -o rss= -p #{Process.pid}`.to_i / 1024
     usage_mb
+  end
+
+  def trips_count
+
+    return 1000 if FILENAME == 'small.json'
+    return 10_000 if FILENAME == 'medium.json'
+    return 100_000 if FILENAME == 'large.json'
+
+    100
+
+    # FILENAME = 'small.json'   # 1000 trips
+    # FILENAME = 'medium.json'  # 10000 trips
+    # FILENAME = 'large.json'   # 100000 trips
   end
 
   def progress_bar
@@ -165,4 +172,30 @@ class Playground
   def full_path
     "fixtures/#{FILENAME}"
   end
+
+  # def create_single_trip(trip)
+  #   from = City.find_or_create_by(name: trip['from'])
+  #   to = City.find_or_create_by(name: trip['to'])
+  #
+  #   services = []
+  #
+  #   trip['bus']['services'].each do |service|
+  #     s = Service.find_or_create_by(name: service)
+  #     services << s
+  #   end
+  #
+  #   bus = Bus.find_or_create_by(number: trip['bus']['number'])
+  #   bus.update(model: trip['bus']['model'], services: services)
+  #
+  #   trip_params = {
+  #     from: from,
+  #     to: to,
+  #     bus: bus,
+  #     start_time: trip['start_time'],
+  #     duration_minutes: trip['duration_minutes'],
+  #     price_cents: trip['price_cents']
+  #   }
+  #
+  #   Trip.new(trip_params)
+  # end
 end
