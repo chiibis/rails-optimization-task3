@@ -12,13 +12,8 @@ class Playground
     @trips = []
 
     @services_cache = {}
-    @services_arr = []
-
     @cities_cache = {}
-    @cities_arr = []
-
     @buses_cache = {}
-    @buses_arr = []
 
     clear_db
 
@@ -41,9 +36,9 @@ class Playground
   end
 
   def active_record_import
-    City.import     @cities_arr
-    Service.import  @services_arr
-    Bus.import      @buses_arr, recursive: true
+    City.import     @cities_cache.values
+    Service.import  @services_cache.values
+    Bus.import      @buses_cache.values, recursive: true
     Trip.import     @trips
   end
 
@@ -64,7 +59,6 @@ class Playground
     unless service.present?
       service = Service.new(name: service_name)
       @services_cache[service_name] = service
-      @services_arr << service
     end
 
     service
@@ -76,7 +70,6 @@ class Playground
     unless city.present?
       city = City.new(name: city_name)
       @cities_cache[city_name] = city
-      @cities_arr << city
     end
 
     city
@@ -84,8 +77,6 @@ class Playground
 
   def cached_bus(bus_node)
     bus_key = "#{bus_node['model']}#{bus_node['number']}"
-
-    # puts "@bus key #{bus_key}"
 
     bus = @buses_cache[bus_key]
 
@@ -105,7 +96,6 @@ class Playground
 
       bus = Bus.new(bus_params)
       @buses_cache[bus_key] = bus
-      @buses_arr << bus
     end
 
     bus
@@ -151,23 +141,18 @@ class Playground
   end
 
   def trips_count
-
     return 1000 if FILENAME == 'small.json'
     return 10_000 if FILENAME == 'medium.json'
     return 100_000 if FILENAME == 'large.json'
 
-    100
-
-    # FILENAME = 'small.json'   # 1000 trips
-    # FILENAME = 'medium.json'  # 10000 trips
-    # FILENAME = 'large.json'   # 100000 trips
+    100 # default
   end
 
-  def progress_bar
-    trips_count = 1000
-    progress_bar = ProgressBar.new(TRIPS_COUNT)
-    progress_bar.increment!
-  end
+  # def progress_bar
+  #   trips_count = 1000
+  #   progress_bar = ProgressBar.new(TRIPS_COUNT)
+  #   progress_bar.increment!
+  # end
 
   def full_path
     "fixtures/#{FILENAME}"
